@@ -5,10 +5,12 @@ import openai
 from bs4 import BeautifulSoup
 import random
 import time
+import os
+from dotenv import load_dotenv  # Import dotenv
 
 # Ensure dependencies are installed
 def install_packages():
-    required_packages = ["openai", "requests", "beautifulsoup4", "pydantic"]
+    required_packages = ["openai", "requests", "beautifulsoup4", "pydantic", "python-dotenv"]
     for package in required_packages:
         try:
             __import__(package)
@@ -17,9 +19,6 @@ def install_packages():
             subprocess.check_call([sys.executable, "-m", "pip", "install", package])
 
 install_packages()
-
-import os
-from dotenv import load_dotenv  # Import dotenv
 
 # Load environment variables from .env file
 load_dotenv()
@@ -34,7 +33,7 @@ openai.api_key = openai_api_key
 
 print("✅ API Key Loaded Successfully (but not printed for security reasons)")
 
-#startup evaluation factors
+# Startup evaluation factors
 class StartupEvaluator:
     def __init__(self, company_name):
         self.company_name = company_name
@@ -65,8 +64,8 @@ class StartupEvaluator:
                 return snippets
         except requests.exceptions.Timeout:
             print("⚠️ Google search timed out. Skipping...")
-        except:
-            print("⚠️ Could not fetch data automatically.")
+        except Exception as e:
+            print(f"⚠️ Could not fetch data automatically: {e}")
         return None
 
     def ask_openai(self, prompt):
@@ -83,56 +82,57 @@ class StartupEvaluator:
             return None
 
     def analyze_startup(self):
-    """Use OpenAI to evaluate all qualitative metrics in a single call to reduce response time."""
-    print("🤖 Calling OpenAI API for analysis...")
+        """Use OpenAI to evaluate all qualitative metrics in a single call."""
+        print("🤖 Calling OpenAI API for analysis...")
 
-    multi_question_prompt = f"""
-    Please analyze the startup "{self.company_name}" based on these criteria:
-    
-    1. Market Opportunity: Describe market size, growth rate, and industry trends.
-    2. Problem & Solution Fit: Explain what problem this startup solves and how it compares to existing solutions.
-    3. Competitive Advantage: What makes this company unique? Does it have a defensible moat?
-    4. Team Strength: Who are the founders and their expertise? Is this a strong team?
-    5. Exit Potential: What are the potential exit strategies (acquisition, IPO, etc.)?
+        multi_question_prompt = f"""
+        Please analyze the startup "{self.company_name}" based on these criteria:
+        
+        1. Market Opportunity: Describe market size, growth rate, and industry trends.
+        2. Problem & Solution Fit: Explain what problem this startup solves and how it compares to existing solutions.
+        3. Competitive Advantage: What makes this company unique? Does it have a defensible moat?
+        4. Team Strength: Who are the founders and their expertise? Is this a strong team?
+        5. Exit Potential: What are the potential exit strategies (acquisition, IPO, etc.)?
+        6. Revenue Growth: Analyze the company's revenue trends.
+        7. Burn Rate & Runway: Assess how long the company can sustain operations.
+        8. Funding History: Summarize funding rounds, investors, and total capital raised.
+        9. Customer Adoption: Evaluate user growth and traction.
+        10. Valuation & Cap Table: Estimate valuation and ownership structure.
 
-    Please provide structured answers in the following format:
+        Please provide structured answers in the following format:
 
-    Market Opportunity: <answer>
-    Problem & Solution Fit: <answer>
-    Competitive Advantage: <answer>
-    Team Strength: <answer>
-    Exit Potential: <answer>
-    """
+        Market Opportunity: <answer>
+        Problem & Solution Fit: <answer>
+        Competitive Advantage: <answer>
+        Team Strength: <answer>
+        Exit Potential: <answer>
+        Revenue Growth: <answer>
+        Burn Rate & Runway: <answer>
+        Funding History: <answer>
+        Customer Adoption: <answer>
+        Valuation & Cap Table: <answer>
+        """
 
-    response = self.ask_openai(multi_question_prompt)
-    
-    if response:
-        # Ensure response is structured
-        for key in self.data.keys():
-            if key in response:
-                self.data[key] = response.split(f"{key}:")[1].split("\n")[0].strip()
+        response = self.ask_openai(multi_question_prompt)
 
-    # Debugging: Check if OpenAI successfully populated the fields
-    print("🔍 AI-Generated Data:", self.data)
+        if response:
+            # Ensure response is structured
+            for key in self.data.keys():
+                if f"{key}:" in response:
+                    self.data[key] = response.split(f"{key}:")[1].split("\n")[0].strip()
 
-
-    def manual_input(self):
-        """Ask user for missing data points only if OpenAI did not return a response."""
-        for key in self.data:
-            if self.data[key] is None:
-                self.data[key] = input(f"Enter {key} for {self.company_name}: ")
+        # Debugging: Check if OpenAI successfully populated the fields
+        print("🔍 AI-Generated Data:", self.data)
 
     def evaluate(self):
-        """Assign scores based on AI-generated data."""
+        """Assign scores based on AI-generated data quality."""
         scores = {}
-        for key in self.data:
-            if isinstance(self.data[key], str) and self.data[key].strip() == "":
-                self.data[key] = None  # Normalize empty inputs
+        for key, value in self.data.items():
+            if value:
+                scores[key] = min(10, max(1, len(value) % 10))  # Basic heuristic
+            else:
+                scores[key] = random.randint(1, 5)  # Assign low score if missing
 
-            # Assign a score based on AI's response length (better responses = higher scores)
-            scores[key] = min(10, max(1, int(len(self.data[key]) % 10))) if self.data[key] else random.randint(1, 10)
-
-        # Final investment score (weighted average)
         total_score = sum(scores.values()) / len(scores)
         return total_score, scores
 
@@ -160,18 +160,13 @@ class StartupEvaluator:
 
         if fetched_info:
             print("✅ Found some data. Now using AI for deeper analysis...")
-        else:
-            print("⚠️ No data found from Google. Moving to AI analysis...")
 
         print("🤖 Calling OpenAI API for insights...")
         self.analyze_startup()
-        
-        print("✍️ Asking for manual inputs (if needed)...")
-        self.manual_input()
-        
+
         print("📊 Evaluating startup...")
         final_score, detailed_scores = self.evaluate()
-        
+
         print("📄 Generating final report...")
         self.generate_report(final_score, detailed_scores)
 
