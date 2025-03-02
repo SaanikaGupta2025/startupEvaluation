@@ -34,7 +34,7 @@ openai.api_key = openai_api_key
 
 print("✅ API Key Loaded Successfully (but not printed for security reasons)")
 
-
+#startup evaluation factors
 class StartupEvaluator:
     def __init__(self, company_name):
         self.company_name = company_name
