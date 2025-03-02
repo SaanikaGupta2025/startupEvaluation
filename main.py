@@ -83,26 +83,38 @@ class StartupEvaluator:
             return None
 
     def analyze_startup(self):
-        """Use OpenAI to evaluate all qualitative metrics in a single call to reduce response time."""
-        print("🤖 Calling OpenAI API for analysis...")
+    """Use OpenAI to evaluate all qualitative metrics in a single call to reduce response time."""
+    print("🤖 Calling OpenAI API for analysis...")
 
-        multi_question_prompt = f"""
-        Please analyze the startup "{self.company_name}" based on these criteria:
-        - Market Opportunity: Describe market size, growth rate, and industry trends.
-        - Problem & Solution Fit: Explain what problem this startup solves and how it compares to existing solutions.
-        - Competitive Advantage: What makes this company unique? Does it have a defensible moat?
-        - Team Strength: Who are the founders and their expertise? Is this a strong team?
-        - Exit Potential: What are the potential exit strategies (acquisition, IPO, etc.)?
-        """
+    multi_question_prompt = f"""
+    Please analyze the startup "{self.company_name}" based on these criteria:
+    
+    1. Market Opportunity: Describe market size, growth rate, and industry trends.
+    2. Problem & Solution Fit: Explain what problem this startup solves and how it compares to existing solutions.
+    3. Competitive Advantage: What makes this company unique? Does it have a defensible moat?
+    4. Team Strength: Who are the founders and their expertise? Is this a strong team?
+    5. Exit Potential: What are the potential exit strategies (acquisition, IPO, etc.)?
 
-        response = self.ask_openai(multi_question_prompt)
-        
-        if response:
-            sections = response.split("\n\n")  # Split based on paragraph responses
-            keys = list(self.data.keys())[:5]  # First 5 are qualitative metrics
-            for i in range(len(keys)):
-                if i < len(sections):
-                    self.data[keys[i]] = sections[i]
+    Please provide structured answers in the following format:
+
+    Market Opportunity: <answer>
+    Problem & Solution Fit: <answer>
+    Competitive Advantage: <answer>
+    Team Strength: <answer>
+    Exit Potential: <answer>
+    """
+
+    response = self.ask_openai(multi_question_prompt)
+    
+    if response:
+        # Ensure response is structured
+        for key in self.data.keys():
+            if key in response:
+                self.data[key] = response.split(f"{key}:")[1].split("\n")[0].strip()
+
+    # Debugging: Check if OpenAI successfully populated the fields
+    print("🔍 AI-Generated Data:", self.data)
+
 
     def manual_input(self):
         """Ask user for missing data points only if OpenAI did not return a response."""
